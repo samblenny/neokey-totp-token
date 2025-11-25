@@ -10,20 +10,21 @@ import digitalio
 import displayio
 from fourwire import FourWire
 from micropython import const
-import pwmio
+from pwmio import PWMOut
 import terminalio
 import time
 
 from adafruit_24lc32 import EEPROM_I2C
-import adafruit_apds9960
+from adafruit_apds9960.apds9960 import APDS9960
 from adafruit_display_text import label
 from adafruit_ds3231 import DS3231
 from adafruit_st7789 import ST7789
 
 
 # Begin TFT backlight dimming (100% brightness is PWM duty_cycle=0xffff)
-backlight = pwmio.PWMOut(board.TFT_BACKLIGHT, frequency=500,
-    duty_cycle=int(0xffff * 0.4))
+BACKLIGHT_ON = const(26214)  # 40% of 0xffff
+BACKLIGHT_OFF = const(0)
+backlight = PWMOut(board.TFT_BACKLIGHT, frequency=500, duty_cycle=BACKLIGHT_ON)
 
 # Configure CLUE's 240x240 ST7789 TFT display with a 4x scaled text label
 displayio.release_displays()
@@ -55,10 +56,12 @@ def atexit_shutdown_display():
         pass
 atexit.register(atexit_shutdown_display)
 
-# Prepare for talking to the I2C RTC and EEPROM chips
-i2c = board.I2C()
+# Prepare for talking to the I2C RTC, EEPROM, and proximity sensor chips
+i2c = busio.I2C(board.SCL, board.SDA, frequency=250_000)
 eeprom = EEPROM_I2C(i2c)
 rtc = DS3231(i2c)
+apds = APDS9960(i2c)
+apds.enable_proximity = True
 
 def format_datetime(t):
     date = '%04d-%02d-%02d' % (t[0:3])
@@ -68,16 +71,32 @@ def format_datetime(t):
 # ---
 # Okay, now actually do something...
 # ---
+PROX_THRESHOLD = const(4)
 print('EEPROM length:', len(eeprom))
 print('EEPROM[:64]:', eeprom[:64])
 print('DS3231 datetime: %s %s' % format_datetime(rtc.datetime))
 t = prev_t = rtc.datetime
+prev_prox = apds.proximity > PROX_THRESHOLD  # True means hand near sensor
+enable = True
 while True:
-    # Update time on display
-    textbox.text = '%s\n %s' % format_datetime(t)
-    display.refresh()
-    # Sleep until second rolls over
+    if enable:
+        # Update display only when backlight is on
+        textbox.text = '%s\n %s' % format_datetime(t)
+        display.refresh()
+    # Wait until second rolls over
     while t.tm_sec == prev_t.tm_sec:
         time.sleep(0.05)
-        t = rtc.datetime
+        if enable:
+            # Poll RTC only when backlight is on
+            t = rtc.datetime
+        # Check proximity sensor, toggle enable & backlight on rising edge only
+        if (p := (apds.proximity > PROX_THRESHOLD)) != prev_prox:
+            prev_prox = p
+            if p:
+                enable = not enable
+                dc = BACKLIGHT_ON if enable else BACKLIGHT_OFF
+                backlight.duty_cycle = dc
+                if not enable:
+                    textbox.text = ''
+                    display.refresh()
     prev_t = t
