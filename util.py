@@ -35,7 +35,7 @@ rtc = DS3231(i2c)
 eeprom = EEPROM_I2C(i2c)
 
 
-def set_clock():
+def set_time():
     print("Set DS3231 RTC time...")
     try:
         y    = int(input("   year: "))
@@ -54,6 +54,8 @@ def now():
     # Return RTC time formatted as a string
     return "%04d-%02d-%02d %02d:%02d:%02d" % ((rtc.datetime)[0:6])
 
+def get_time():
+    print(now())
 
 def format_eeprom():
     # 1. Confirm if user really wants to format the EEPROM
@@ -208,3 +210,48 @@ def copy_totp_account():
     eeprom[4 + (dest_slot - 1)] = 0xFF
 
     print(f"TOTP account copied from slot {src_slot} to slot {dest_slot}.")
+
+
+def menu():
+    # List the available functions with brief descriptions
+    print("Available functions:")
+    print()
+    print(" 1. add_totp_account()    - Add a new TOTP account.")
+    print(" 2. copy_totp_account()   - Copy a TOTP account to another slot.")
+    print(" 3. erase_totp_account()  - Erase a TOTP account from EEPROM.")
+    print(" 4. format_eeprom()       - Format the EEPROM for TOTP storage.")
+    print(" 5. get_time()            - Get the current DS3231 RTC time.")
+    print(" 6. list_totp_accounts()  - List all stored TOTP accounts.")
+    print(" 7. set_time()            - Set the DS3231 RTC time.")
+    print()
+
+    # Prompt for which function to invoke
+    choice = input(
+        "Choose a function by number (or Enter to cancel): ").strip()
+
+    # If the user entered an empty string, do nothing
+    if choice == "":
+        print("Operation canceled.")
+        return
+
+    # Convert input to an integer and invoke the corresponding function
+    try:
+        choice = int(choice)
+        if choice == 1:
+            add_totp_account()
+        elif choice == 2:
+            copy_totp_account()
+        elif choice == 3:
+            erase_totp_account()
+        elif choice == 4:
+            format_eeprom()
+        elif choice == 5:
+            get_time()
+        elif choice == 6:
+            list_totp_accounts()
+        elif choice == 7:
+            set_time()
+        else:
+            raise ValueError(f"Invalid choice: {choice}")
+    except ValueError as e:
+        raise ValueError(f"Invalid input: {e}")
