@@ -169,3 +169,42 @@ def list_totp_accounts():
             print(f"Slot {slot}: '{label}'")
         else:
             print(f"Slot {slot}: -- empty --")
+
+
+def copy_totp_account():
+    # Prompt for the source slot number
+    src_slot = int(input("Enter source slot number (1-15): "))
+    if not (1 <= src_slot <= 15):
+        raise ValueError("Slot number must be between 1 and 15.")
+
+    # Check if the source slot is in use
+    src_in_use_marker = eeprom[4 + (src_slot - 1)]
+    if src_in_use_marker != b'\xFF':
+        raise ValueError(f"Source slot {src_slot} is not in use.")
+
+    # Prompt for the destination slot number
+    dest_slot = int(input("Enter destination slot number (1-15): "))
+    if not (1 <= dest_slot <= 15):
+        raise ValueError("Slot number must be between 1 and 15.")
+
+    # Check if the destination slot is in use
+    dest_in_use_marker = eeprom[4 + (dest_slot - 1)]
+    if dest_in_use_marker == b'\xFF':
+        # Prompt to confirm overwriting the destination slot
+        overwrite = input(
+            f"Slot {dest_slot} is in use. Overwrite? (y/n): ").strip().lower()
+        if overwrite != 'y':
+            print("Operation canceled.")
+            return
+
+    # Define the base addresses for the source and destination slots
+    src_base = 32 + (src_slot - 1) * 64
+    dest_base = 32 + (dest_slot - 1) * 64
+
+    # Copy TOTP account data (label + secret) from the source to destination
+    eeprom[dest_base:dest_base + 64] = eeprom[src_base:src_base + 64]
+
+    # Update the in-use marker for the destination slot
+    eeprom[4 + (dest_slot - 1)] = 0xFF
+
+    print(f"TOTP account copied from slot {src_slot} to slot {dest_slot}.")
