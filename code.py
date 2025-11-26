@@ -13,6 +13,7 @@ from fourwire import FourWire
 import gc
 from micropython import const
 from pwmio import PWMOut
+import os
 import terminalio
 import time
 
@@ -28,6 +29,15 @@ from sb_totp import base32_encode, totp_sha1
 
 
 PROX_THRESHOLD = const(4)
+
+# ---------------------------------------------------------------------------
+# Options for settings.toml
+# - `BLE_KEYBOARD = 0` to disable the BLE HID keyboard (default: BLE enabled)
+#
+BLE_KEYBOARD = True
+if (val := os.getenv("BLE_KEYBOARD")) is not None:
+    BLE_KEYBOARD = bool(val)
+# ---------------------------------------------------------------------------
 
 
 # Begin TFT backlight dimming (100% brightness is PWM duty_cycle=0xffff)
@@ -134,9 +144,13 @@ prev_a = button_A.value
 prev_b = button_B.value
 
 # Initialize BLE keyboard
-gc.collect()
-ble_keeb = BLEKeeb()
-gc.collect()
+ble_keeb = None
+if BLE_KEYBOARD:
+    gc.collect()
+    ble_keeb = BLEKeeb()
+    gc.collect()
+else:
+    print("BLE keyboard feature disabled by settings.toml")
 
 
 # ---
@@ -163,7 +177,8 @@ while True:
         if advertise:
             # Starting BLE advertising is slow, so we do this after the first
             # screen update rather than before the main loop
-            ble_keeb.advertise()
+            if BLE_KEYBOARD:
+                ble_keeb.advertise()
             advertise = False
     gc.collect()
 
@@ -179,11 +194,12 @@ while True:
             if bl_enable and (not va) and prev_a:
                 # Falling edge of button A press -> send TOTP code
                 print("Button A pressed")
-                if ble_keeb.connected():
-                    print(f" Sending code on BLE")
-                    ble_keeb.send_code(totp_code + "\n")
-                else:
-                    print(" BLE not connected")
+                if BLE_KEYBOARD:
+                    if ble_keeb.connected():
+                        print(f" Sending code on BLE")
+                        ble_keeb.send_code(totp_code + "\n")
+                    else:
+                        print(" BLE not connected")
             prev_a = va
 
             # Check Button B
@@ -214,7 +230,7 @@ while True:
                     backlight.duty_cycle = dc
                     if bl_enable:
                         # Just turned backlight on, so poke BLE radio
-                        if not ble_keeb.connected():
+                        if BLE_KEYBOARD and not ble_keeb.connected():
                             ble_keeb.advertise()
                     else:
                         # Clear display when we've turned the backlight off
