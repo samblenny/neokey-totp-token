@@ -229,7 +229,8 @@ while True:
                     dc = BACKLIGHT_ON if bl_enable else BACKLIGHT_OFF
                     backlight.duty_cycle = dc
                     if bl_enable:
-                        # Just turned backlight on, so poke BLE radio
+                        # Just turned backlight on: request refresh, poke BLE
+                        need_refresh = True
                         if BLE_KEYBOARD and not ble_keeb.connected():
                             ble_keeb.advertise()
                     else:
