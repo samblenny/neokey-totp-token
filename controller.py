@@ -101,6 +101,9 @@ class Controller:
         self.backlight.duty_cycle = BACKLIGHT_OFF
         self.bl_enable = False
         self.set_text('')
+        # Also make sure NeoKey NeoPixels are off
+        for i in range(4):
+            self.set_neokey_off(i)
 
     def backlight_on(self):
         self.backlight.duty_cycle = BACKLIGHT_ON

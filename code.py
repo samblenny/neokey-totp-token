@@ -68,36 +68,41 @@ while True:
             prev_nk = nk                 # update previous values for next loop
 
             # Did any key get pressed while backlight was off?
-            just_woke_up = False
+            waking_up = False
             if (diff & nk) and not ctrl.bl_enable:
                 # Rising edge of key press -> wake up the screen
                 ctrl.backlight_on()
                 need_refresh = True
-                just_woke_up = True  # don't go back to sleep when key released
+                waking_up = True  # don't go back to sleep when key released
 
             # Check for key press to select TOTP account slots. When the
             # currently selected key is pressed, turn off the display. When a
-            # different key is pressed, try to select the slot for that key.
+            # different key is pressed, select the slot for that key.
             for i, bitmask in enumerate((NEOKEY0, NEOKEY1, NEOKEY2, NEOKEY3)):
-                if diff & bitmask:
-                    if nk & bitmask:
-                        # Pressed: Turn off display if this slot is already
-                        # selected, or select this slot if not currently
-                        # selected
-                        if ctrl.bl_enable and slot == i:
-                            if not just_woke_up:
+                if diff & bitmask and ctrl.bl_enable:
+                    # Check if other keys were already down to avoid potential
+                    # weird glitchy behavior if you fat-finger multiple keys at
+                    # the same time
+                    other_keys_pressed = bool(nk & (~bitmask))
+                    if nk & bitmask and not other_keys_pressed:
+                        # Key was just pressed
+                        if slot == i:
+                            # Slot was already selected (toggle backlight?)
+                            if not waking_up:
                                 ctrl.backlight_off()
                                 ctrl.set_neokey_off(i)
-                        elif ctrl.select_account(i):
-                            # Slot is configured
-                            ctrl.set_neokey(i, NP_AMBER)
-                            need_refresh = True
                         else:
-                            # Slot is empty
-                            ctrl.set_neokey(i, NP_RED)
-                            need_refresh = True
+                            # Slot wasn't selected -> select it
+                            if ctrl.select_account(i):
+                                # Selected a non-empty slot
+                                ctrl.set_neokey(i, NP_AMBER)
+                                need_refresh = True
+                            else:
+                                # Empty slot
+                                ctrl.set_neokey(i, NP_RED)
+                                need_refresh = True
                     else:
-                        # Released
+                        # Key released or other keys were already pressed
                         pass
 
             # -- END of input polling loop --
