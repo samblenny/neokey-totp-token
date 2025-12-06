@@ -34,7 +34,7 @@ while True:
     # Redraw the display only when backlight is on
     if ctrl.bl_enable:
         seconds = t[5] % 30
-        ctrl.set_text('%02d %s\n%s' % (seconds, label, totp_code))
+        ctrl.set_text('%02d\n%s\n%s' % (seconds, label, totp_code))
 
     # Make sure the right NeoKey selected slot LED is lit
     for i in range(4):
