@@ -6,10 +6,9 @@ Related Learn Guides:
 - https://learn.adafruit.com/adafruit-ds3231-precision-rtc-breakout
 - https://learn.adafruit.com/adafruit-24lc32-i2c-eeprom-breakout-32kbit-4-kb
 - https://learn.adafruit.com/neokey-1x4-qt-i2c (I2C 4 key keyboard)
-- https://learn.adafruit.com/adafruit-apds9960-breakout (CLUE light sensor)
 - https://learn.adafruit.com/adafruit-1-3-and-1-54-240-x-240-wide-angle-tft-lcd-displays
   (CLUE 1.3" 240x240 ST7789 display)
-- https://learn.adafruit.com/ble-hid-keyboard-buttons-with-circuitpython/overview
+- https://learn.adafruit.com/neokey-1x4-qt-i2c
 
 
 Related API Docs:
@@ -18,17 +17,11 @@ Related API Docs:
 - https://docs.circuitpython.org/en/latest/shared-bindings/busio/#busio.SPI
 - https://docs.circuitpython.org/projects/ds3231/en/stable/api.html
 - https://docs.circuitpython.org/en/latest/shared-bindings/pwmio/
-- https://docs.circuitpython.org/projects/apds9960/en/latest/api.html
-- https://docs.circuitpython.org/projects/ble/en/latest/
-- https://docs.circuitpython.org/projects/hid/en/latest/
 
 
 RFCs:
 - [RFC 4226: HOTP](https://datatracker.ietf.org/doc/html/rfc4226)
 - [RFC 6238: TOTP](https://datatracker.ietf.org/doc/html/rfc6238)
-
-Other Specs:
-- https://www.bluetooth.com/specifications/assigned-numbers/ (BLE appearance)
 
 
 Pins provided by `import board`:

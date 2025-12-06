@@ -1,26 +1,25 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- SPDX-FileCopyrightText: Copyright 2025 Sam Blenny -->
-# BLE Keeb TOTP Token
+# NeoKey TOTP Token
 
-**DRAFT: WORK IN PROGRESS**
-
-This is a two factor authentication token to generate TOTP login codes with an
-optional BLE HID keyboard code typing feature. The design is for desktop use in
-a safe location (wall power + no worries of physical tampering) but where you
-do want to prevent secrets from leaking over the network due to mis-configured
-cloud-sync backup features or whatever.
+This is a two factor authentication token to generate TOTP login codes for up
+to four accounts. You can select which account by pressing a key on the 4-key
+NeoKey keypad. The design is intended for desktop use in a safe location (wall
+power + no worries of physical tampering) but where you do want to prevent
+secrets from leaking over the network due to mis-configured cloud-sync backup
+features or whatever.
 
 Design Goals and Features:
 
 1. Make the codes really easy to read and type, even in low light, by using a
-   dimmable backlit TFT display and optional BLE HID keyboard output.
+   dimmable backlit TFT display with a relatively large font.
 
-2. Support 15 TOTP account slots (chosen because you can use key chording to
-   enter binary for 1 to 15 on a 4-key NeoKey keypad).
+2. Support 4 TOTP account slots (one for each key of a 4-key NeoKey keypad).
 
-3. Wave your hand past the CLUE's proximity sensor to toggle standby mode.
-   At power up, backlight is on. Wave to turn the backlight off. Wave again to
-   turn the backlight on.
+3. The NeoPixel under the key for the currently selected account slot lights
+   up. Pressing a different key switches the selected account. Pressing the
+   selected key a second time puts the token in standby mode (backlight and
+   NeoPixels off).
 
 4. Store secrets in an I2C EEPROM rather than in the CLUE board's flash. This
    makes it so the secrets aren't trivially accessible to a connected computer
@@ -33,12 +32,8 @@ Design Goals and Features:
 6. Add and manage TOTP accounts in the EEPROM's database of account slots by
    using similar REPL functions (`import util` then `util.menu()`).
 
-7. Use the token after initial setup by powering it from a phone charger,
-   reading codes off the TFT display, or having the token type codes over BLE
-   HID when you press the key chord for an account slot.
-
-8. Allow a fully airgapped mode with a settings.toml option to turn off the BLE
-   keyboard feature.
+7. Use the token fully airgapped after initial setup by powering it from a
+   phone charger and reading codes off the TFT display.
 
 
 
@@ -54,8 +49,7 @@ Additional Parts:
 - [Kailh Mechanical Key Switches Cherry MX Brown Compatible](https://www.adafruit.com/product/4954)
 - [Translucent Smoke DSA Keycaps for MX Compatible Switches](https://www.adafruit.com/product/5008)
 - [CR1220 3V Lithium Coin Cell Battery](https://www.adafruit.com/product/380)
-- [STEMMA QT / Qwiic JST SH 4-Pin Cable - 50mm Long](https://www.adafruit.com/product/4399) (qty 2)
-- [STEMMA QT / Qwiic JST SH 4-pin Cable - 100mm Long](https://www.adafruit.com/product/4210) (qty 1)
+- [STEMMA QT / Qwiic JST SH 4-Pin Cable - 50mm Long](https://www.adafruit.com/product/4399) (qty 3)
 
 
 ## Install & Setup
@@ -132,8 +126,7 @@ To get started managing the EEPROM database, open the USB serial console and do
 the Ctrl-C thing to get into the CircuitPython REPL. From there, import util
 then call `util.menu()` to see what's available. The first time, you will need
 to format the EEPROM. After that, you can add, erase, or copy accounts as you
-like. There are 15 available slots (chosen to fit what can be selected with
-chording key-presses on a 4 key NeoKey keypad).
+like. There are 4 available slots (one for each key of a 4-key NeoKey keypad).
 
 This is an example of how it might look to use the menu:
 
@@ -155,16 +148,5 @@ Slot 1: 'adafruit'
 Slot 2: 'gmail'
 Slot 3: 'discord'
 Slot 4: -- empty --
-Slot 5: -- empty --
-Slot 6: -- empty --
-Slot 7: -- empty --
-Slot 8: -- empty --
-Slot 9: -- empty --
-Slot 10: -- empty --
-Slot 11: -- empty --
-Slot 12: -- empty --
-Slot 13: -- empty --
-Slot 14: -- empty --
-Slot 15: -- empty --
 >>>
 ```

@@ -67,11 +67,14 @@ def get_time():
     print(now())
 
 
-def get_slot_input():
+def get_slot_input(tag=None):
     # Prompts the user for a valid slot number
-    slot = int(input("Enter slot number (1-15): "))
-    if not (1 <= slot <= 15):
-        raise ValueError("Invalid slot number. Must be between 1 and 15.")
+    prompt = "Enter slot number (1-4): "
+    if tag is not None:
+        prompt = f"{tag}: {prompt}"
+    slot = int(input(prompt))
+    if not (1 <= slot <= 4):
+        raise ValueError("Invalid slot number. Must be between 1 and 4.")
     return slot
 
 
@@ -184,8 +187,8 @@ def list_totp_accounts():
     # Check for 'TOTP' magic bytes in the EEPROM
     check_eeprom_format(eeprom)
 
-    # Iterate through each of the 15 possible slots
-    for slot in range(1, 16):
+    # Iterate through each of the 4 possible slots
+    for slot in range(1, 5):
         try:
             # Load label and secret from EEPROM for the given slot
             label, _ = load_totp_account(eeprom, slot)
@@ -197,14 +200,14 @@ def list_totp_accounts():
 
 def copy_totp_account():
     # Prompt for the source slot number
-    src_slot = get_slot_input()
+    src_slot = get_slot_input("Source")
 
     # Check if the source slot is in use
     if not is_slot_in_use(eeprom, src_slot):
         raise ValueError(f"Source slot {src_slot} is not in use.")
 
     # Prompt for the destination slot number
-    dest_slot = get_slot_input()
+    dest_slot = get_slot_input("Destination")
 
     # Check if the destination slot is in use
     if is_slot_in_use(eeprom, dest_slot):

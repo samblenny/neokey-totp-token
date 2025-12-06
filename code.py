@@ -3,254 +3,109 @@
 #
 # See NOTES.md for documentation links and pinout info.
 #
-import atexit
-import board
-import busio
-import collections
-import digitalio
-import displayio
-from fourwire import FourWire
-import gc
-from micropython import const
-from pwmio import PWMOut
-import os
-import terminalio
 import time
 
-from adafruit_24lc32 import EEPROM_I2C
-from adafruit_apds9960.apds9960 import APDS9960
-from adafruit_display_text import label
-from adafruit_ds3231 import DS3231
-from adafruit_st7789 import ST7789
-
-from ble_keeb import BLEKeeb
-from eeprom_db import check_eeprom_format, is_slot_in_use, load_totp_account
-from sb_totp import base32_encode, totp_sha1
+from controller import (Controller, NEOKEY0, NEOKEY1, NEOKEY2, NEOKEY3,
+    NP_AMBER, NP_RED)
 
 
-PROX_THRESHOLD = const(4)
-
-# ---------------------------------------------------------------------------
-# Options for settings.toml
-# - `BLE_KEYBOARD = 0` to disable the BLE HID keyboard (default: BLE enabled)
-#
-BLE_KEYBOARD = True
-if (val := os.getenv("BLE_KEYBOARD")) is not None:
-    BLE_KEYBOARD = bool(val)
-# ---------------------------------------------------------------------------
+# The controller manages IO with I2C and SPI devices, and it keeps track of the
+# EEPROM-backed database of TOTP accounts
+ctrl = Controller()
+ctrl.load_totp_accounts()
 
 
-# Begin TFT backlight dimming (100% brightness is PWM duty_cycle=0xffff)
-BACKLIGHT_ON = const(26214)  # 40% of 0xffff
-BACKLIGHT_OFF = const(0)
-backlight = PWMOut(board.TFT_BACKLIGHT, frequency=500, duty_cycle=BACKLIGHT_ON)
-
-# Configure CLUE's 240x240 ST7789 TFT display with a 4x scaled text label
-displayio.release_displays()
-gc.collect()
-spi = busio.SPI(board.TFT_SCK, MOSI=board.TFT_MOSI)
-# print("spi frequency", spi.frequency) # default is 32MHz which works fine
-display_bus = FourWire(spi, command=board.TFT_DC, chip_select=board.TFT_CS,
-    reset=board.TFT_RESET)
-display = ST7789(display_bus, width=240, height=240, rowstart=80, bgr=True,
-    rotation=0, auto_refresh=False)
-group = displayio.Group()
-display.root_group = group
-display.refresh()
-textbox = label.Label(font=terminalio.FONT, scale=4, color=0xefef00)
-textbox.anchor_point = (0, 0)
-textbox.anchored_position = (0, 0)
-textbox.line_spacing = 1.0  # default is 1.25
-group.append(textbox)
-
-# Set an atexit handler to release the display once code.py ends. This is an
-# aesthetic filter to prevent CircuitPython's supervisor from hijacking the
-# display to show its own stuff, which I don't want to see.
-def atexit_shutdown_display():
-    try:
-        textbox.text = 'OFFLINE'
-        display.refresh()
-        displayio.release_displays()
-        spi.deinit()
-    except AttributeError:
-        pass
-atexit.register(atexit_shutdown_display)
-
-# Prepare for talking to the I2C RTC, EEPROM, and proximity sensor chips
-i2c = busio.I2C(board.SCL, board.SDA, frequency=250_000)
-eeprom = EEPROM_I2C(i2c)
-rtc = DS3231(i2c)
-apds = APDS9960(i2c)
-apds.enable_proximity = True
-
-def format_datetime(t):
-    date = '%04d-%02d-%02d' % (t[0:3])
-    time = '%02d:%02d:%02d' % (t[3:6])
-    return (date, time)
-
-# Print startup info to check on EEPROM and RTC
-print('EEPROM[:32]:', eeprom[:32])
-print('DS3231 datetime: %s %s' % format_datetime(rtc.datetime))
-
-
-# Load TOTP account slot data from EEPROM database (label + base32 secret)
-TOTPAccount = collections.namedtuple("TOTPAccount",
-    ["slot", "label", "secret_b32"])
-accounts = []
-try:
-    check_eeprom_format(eeprom)
-    for slot in [i for i in range(1, 16) if is_slot_in_use(eeprom, i)]:
-        label, secret_bytes = load_totp_account(eeprom, slot)
-        secret_b32 = base32_encode(secret_bytes)
-        accounts.append(TOTPAccount(slot, label, secret_b32))
-except ValueError as e:
-    print(e)
-
-# Track index of the selected account, or None if no accounts are available
-selected_account_index = None if len(accounts) == 0 else 0
-
-def select_next_account():
-    # Increment selected account index, modulo total number of accounts
-    global selected_account_index
-    if len(accounts) == 0:
-        return
-    selected_account_index = (selected_account_index + 1) % len(accounts)
-
-def get_selected_totp(unix_time):
-    # Get TOTP slot, label, and code for the selected account
-    if selected_account_index is None:
-        return ('', '', '')
-    acct = accounts[selected_account_index]
-    # CAUTION! For boards that use adafruit_hashlib.hashlib for SHA1, this
-    # call may take on the order of 2 seconds to finish
-    code = totp_sha1(acct.secret_b32, unix_time, digits=6, period=30)
-    return (acct.slot, acct.label, code)
-
-# Print summary from loading the EEPROM account database
-print(f"Loaded data for {len(accounts)} TOTP account slots from EEPROM")
-for i, a in enumerate(accounts):
-    selected = i == selected_account_index
-    print(f" slot {a.slot}: '{a.label}'")
-if selected_account_index is not None:
-    print("Selected Slot:", accounts[selected_account_index].slot)
-
-
-# Prepare for using CLUE buttons to cycle through TOTP account slots
-button_A = digitalio.DigitalInOut(board.BUTTON_A)
-button_B = digitalio.DigitalInOut(board.BUTTON_B)
-button_A.pull = digitalio.Pull.UP
-button_B.pull = digitalio.Pull.UP
-prev_a = button_A.value
-prev_b = button_B.value
-
-# Initialize BLE keyboard
-ble_keeb = None
-if BLE_KEYBOARD:
-    gc.collect()
-    ble_keeb = BLEKeeb()
-    gc.collect()
-else:
-    print("BLE keyboard feature disabled by settings.toml")
-
-
-# ---
-# Main Loop
-# ---
-
-# Variables to track when interesting values have changed
-t = rtc.datetime
+# These variables help with edge detection of changing values in the main loop
+t = ctrl.datetime()
 prev_t = t
-prev_prox = apds.proximity > PROX_THRESHOLD  # True means hand near sensor
-bl_enable = True
-advertise = True
-slot, label, totp_code = get_selected_totp(time.mktime(t))
+prev_nk = ctrl.get_neokey_bits()
+need_refresh = True
 
+# Main loop
 while True:
 
-    # Update display only when backlight is on
-    if bl_enable:
-        (date, time_str) = format_datetime(t)
-        textbox.text = '%s\n%s\n%s %s\n%s' % (date, time_str, slot, label,
-            totp_code)
-        display.refresh()
-        need_refresh = False
-        if advertise:
-            # Starting BLE advertising is slow, so we do this after the first
-            # screen update rather than before the main loop
-            if BLE_KEYBOARD:
-                ble_keeb.advertise()
-            advertise = False
-    gc.collect()
+    # Is it time to update the TOTP code? (period over or refresh requested)
+    if t.tm_sec % 30 == 0 or need_refresh:
+        # Generate new totp code at multiples of 30 seconds
+        unix_time = time.mktime(ctrl.datetime())
+        slot, label, totp_code = ctrl.get_selected_totp(unix_time)
+        code_changed = True
+
+    # Redraw the display only when backlight is on
+    if ctrl.bl_enable:
+        seconds = t[5] % 30
+        ctrl.set_text('%02d %s\n%s' % (seconds, label, totp_code))
+
+    # Make sure the right NeoKey selected slot LED is lit
+    for i in range(4):
+        if i == ctrl.get_selected_slot():
+            if ctrl.is_selected_slot_empty():
+                ctrl.set_neokey(i, NP_RED)    # red for empty slots
+            else:
+                ctrl.set_neokey(i, NP_AMBER)  # amber for configured slots
+        else:
+            ctrl.set_neokey_off(i)
+
+    # Clear the manual update requested flag
+    need_refresh = False
 
     # Wait until second rolls over
     while t.tm_sec == prev_t.tm_sec and not need_refresh:
 
-        # 1. Spend about 100ms fast-polling for input events
+        # 1. Spend about 100ms polling for input events
         t_10Hz = time.monotonic() + 0.1
         while time.monotonic() < t_10Hz and not need_refresh:
 
-            # Check Button A
-            va = button_A.value
-            if bl_enable and (not va) and prev_a:
-                # Falling edge of button A press -> send TOTP code
-                print("Button A pressed")
-                if BLE_KEYBOARD:
-                    if ble_keeb.connected():
-                        print(f" Sending code on BLE")
-                        ble_keeb.send_code(totp_code + "\n")
-                    else:
-                        print(" BLE not connected")
-            prev_a = va
-
-            # Check Button B
-            vb = button_B.value
-            if bl_enable and (not vb) and prev_b:
-                # Falling edge of button B press -> select next account
-                print("Button B pressed")
-                select_next_account()
-                # Update slot and label now, clear code as it updates slowly
-                acct = accounts[selected_account_index]
-                textbox.text = '%s\n%s\n%s %s' % (date, time_str,
-                    acct.slot, acct.label)
-                display.refresh()
-                # Request new code (this may take a bit)
-                slot_changed = True
-                need_refresh = True
-            prev_b = vb
-
-            # Check Proximity Sensor
-            prox_event = apds.proximity > PROX_THRESHOLD
-            if prox_event != prev_prox:
-                prev_prox = prox_event
-                if prox_event:
-
-                    # Leading edge of proximity event -> update backlight, etc
-                    bl_enable = not bl_enable
-                    dc = BACKLIGHT_ON if bl_enable else BACKLIGHT_OFF
-                    backlight.duty_cycle = dc
-                    if bl_enable:
-                        # Just turned backlight on: request refresh, poke BLE
-                        need_refresh = True
-                        if BLE_KEYBOARD and not ble_keeb.connected():
-                            ble_keeb.advertise()
-                    else:
-                        # Clear display when we've turned the backlight off
-                        textbox.text = ''
-                        display.refresh()
-
             # Sleep to rate limit I2C, debounce buttons, do VM background tasks
-            time.sleep(0.05)
+            time.sleep(0.01)
+
+            # Check the currently selected TOTP account slot
+            slot = ctrl.get_selected_slot()
+
+            # Monitor the 4 NeoKeys for state transitions
+            nk = ctrl.get_neokey_bits()  # get bitfield of current key states
+            diff = nk ^ prev_nk          # use XOR to find which bits changed
+            prev_nk = nk                 # update previous values for next loop
+
+            # Did any key get pressed while backlight was off?
+            just_woke_up = False
+            if (diff & nk) and not ctrl.bl_enable:
+                # Rising edge of key press -> wake up the screen
+                ctrl.backlight_on()
+                need_refresh = True
+                just_woke_up = True  # don't go back to sleep when key released
+
+            # Check for key press to select TOTP account slots. When the
+            # currently selected key is pressed, turn off the display. When a
+            # different key is pressed, try to select the slot for that key.
+            for i, bitmask in enumerate((NEOKEY0, NEOKEY1, NEOKEY2, NEOKEY3)):
+                if diff & bitmask:
+                    if nk & bitmask:
+                        # Pressed: Turn off display if this slot is already
+                        # selected, or select this slot if not currently
+                        # selected
+                        if ctrl.bl_enable and slot == i:
+                            if not just_woke_up:
+                                ctrl.backlight_off()
+                                ctrl.set_neokey_off(i)
+                        elif ctrl.select_account(i):
+                            # Slot is configured
+                            ctrl.set_neokey(i, NP_AMBER)
+                            need_refresh = True
+                        else:
+                            # Slot is empty
+                            ctrl.set_neokey(i, NP_RED)
+                            need_refresh = True
+                    else:
+                        # Released
+                        pass
+
+            # -- END of input polling loop --
+
 
         # 2. Poll RTC at about 10 Hz to detect when seconds have changed
-        if bl_enable:
-            t = rtc.datetime
+        if ctrl.bl_enable:
+            t = ctrl.datetime()
 
     # After the seconds have changed, update the previous time
     prev_t = t
-
-    # RTC seconds have incremented (or need refresh), so check the TOTP period
-    if t.tm_sec % 30 == 0 or need_refresh:
-        # Generate new totp code at multiples of 30 seconds
-        unix_time = time.mktime(rtc.datetime)
-        slot, label, totp_code = get_selected_totp(unix_time)
-        code_changed = True

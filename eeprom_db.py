@@ -6,9 +6,9 @@
 #
 # Database file format:
 # - The first 4 bytes (eeprom[0:4]) of a formatted EEPROM should be b'TOTP'
-# - Next 15 bytes (eeprom[4:19]) of the header are markers to indicate which
+# - Next 4 bytes (eeprom[4:8]) of the header are markers to indicate which
 #   account slots are in use
-# - Remainder of header (eeprom[19:32]) is reserved
+# - Remainder of header (eeprom[8:32]) is reserved
 # - Account slots are 64 bytes. Slot 1 is at eeprom[32:96], slot 2 is at
 #   eeprom[96:160], etc.
 # - Account slot format is: 8 bytes null padded label, 24 bytes reserved, 32
@@ -30,8 +30,8 @@ def is_slot_in_use(eeprom, slot):
 
 def load_totp_account(eeprom, slot):
     # Ensure slot number is valid and slot is in use
-    if not (1 <= slot <= 15):
-        raise ValueError("Invalid slot number. Must be between 1 and 15.")
+    if not (1 <= slot <= 4):
+        raise ValueError("Invalid slot number. Must be between 1 and 4.")
     if not is_slot_in_use(eeprom, slot):
         raise ValueError(f"Slot {slot} is not in use.")
 
