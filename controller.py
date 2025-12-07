@@ -38,8 +38,8 @@ NEOKEY2 = const(4)
 NEOKEY3 = const(8)
 
 # NeoKey NeoPixel color constants
-NP_AMBER = const(0x060600)
-NP_RED   = const(0x0C0000)
+NP_AMBER = const(0x202000)
+NP_RED   = const(0x400000)
 NP_OFF   = const(0)
 
 
