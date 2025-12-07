@@ -41,6 +41,8 @@ Design Goals and Features:
 
 ## Hardware
 
+![neokey-totp-token-assembly.jpeg](neokey-totp-token-assembly.jpeg)
+
 The code here is written for:
 - [Adafruit CLUE - nRF52840 Express](https://www.adafruit.com/product/4500)
 - [Adafruit DS3231 Precision RTC](https://www.adafruit.com/product/5188)
@@ -51,7 +53,20 @@ Additional Parts:
 - [Kailh Mechanical Key Switches Cherry MX Brown Compatible](https://www.adafruit.com/product/4954)
 - [Translucent Smoke DSA Keycaps for MX Compatible Switches](https://www.adafruit.com/product/5008)
 - [CR1220 3V Lithium Coin Cell Battery](https://www.adafruit.com/product/380)
-- [STEMMA QT / Qwiic JST SH 4-Pin Cable - 50mm Long](https://www.adafruit.com/product/4399) (qty 3)
+- [STEMMA QT / Qwiic JST SH 4-Pin Cable - 50mm Long](https://www.adafruit.com/product/4399) (qty 2)
+- [STEMMA QT / Qwiic JST SH 4-Pin Cable - 100mm Long](https://www.adafruit.com/product/4210) (qty 1)
+- 2-28x3/16" Thread Rolling Screws (very short self tapping plastic screws)
+- 2-28x1/4" Thread Rolling Screws (short self tapping plastic screws)
+
+
+## 3D Printable Enclosure
+
+The Blender design file and STL printable files for the enclosure are in the
+[enclosure/](enclosure) directory.
+
+To attach the I2C breakout boards to the base of the enclosure, use 2-28x3/16"
+thread rolling screws. To attach the bezel to the base, use 2-28x1/4" thread
+rolling screws.
 
 
 ## Install & Setup
