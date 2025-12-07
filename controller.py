@@ -73,7 +73,7 @@ class Controller:
         display.refresh()
         textbox = label.Label(font=terminalio.FONT, scale=4, color=0xefef00)
         textbox.anchor_point = (0, 0)
-        textbox.anchored_position = (0, 0)
+        textbox.anchored_position = (16, 8)
         textbox.line_spacing = 1.25  # default is 1.25
         group.append(textbox)
         self.spi = spi
